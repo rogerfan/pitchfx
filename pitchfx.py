@@ -109,12 +109,9 @@ def _dl_game_data_part(url, loc, filename):
     r = requests.get(url)
     if r.status_code == 404:
         raise Error404(url)
-
-    root = ET.fromstring(r.content)
-    tree = ET.ElementTree(root)
-
-    fileloc = os.path.join(loc, filename)
-    tree.write(fileloc)
+    
+    with open(os.path.join(loc, filename), 'w') as file_:
+        file_.write(r.text)
 
 def _create_folder(path):
     if not os.path.isdir(path):
