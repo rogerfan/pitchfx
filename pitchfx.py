@@ -97,6 +97,16 @@ def _dl_game_data(url_loc, loc, gamename):
 
     print("    ==> Done.")
 
+def _dl_game_data_part(url, loc, filename):
+    '''Download a game data piece.'''
+
+    r = requests.get(url)
+    if r.status_code == 404:
+        raise Error404(url)
+    
+    with open(os.path.join(loc, filename), 'w') as file_:
+        file_.write(r.text)
+
 def _get_playerlist(url):
     '''Create a list of player .xml files at a url.'''
     
@@ -113,16 +123,6 @@ def _get_playerlist(url):
 def _get_gamelist(url):
     '''Create a list of game folders at a url.'''
     pass
-
-def _dl_game_data_part(url, loc, filename):
-    '''Download a game data piece.'''
-
-    r = requests.get(url)
-    if r.status_code == 404:
-        raise Error404(url)
-    
-    with open(os.path.join(loc, filename), 'w') as file_:
-        file_.write(r.text)
 
 def _create_folder(path):
     if not os.path.isdir(path):
