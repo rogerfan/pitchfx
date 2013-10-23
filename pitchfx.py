@@ -74,10 +74,10 @@ def _dl_game_data(url_loc, loc, gamename):
     _create_folder(batterloc)
     _create_folder(pitcherloc)
 
-    try:
-        sys.stdout.write("Downloading data for game: " + gamename)
-        sys.stdout.flush()
+    sys.stdout.write("Downloading data for game: " + gamename)
+    sys.stdout.flush()
 
+    try:
         _dl_game_data_part(gameurl + "/boxscore.xml", gameloc, "boxscore.xml")
         _dl_game_data_part(gameurl + "/game.xml"    , gameloc, "game.xml")
         _dl_game_data_part(gameurl + "/players.xml" , gameloc, "players.xml")
@@ -99,6 +99,7 @@ def _dl_game_data(url_loc, loc, gamename):
 
 def _get_playerlist(url):
     '''Create a list of player .xml files at a url.'''
+    
     r = requests.get(url)
     if r.status_code == 404:
         raise Error404(url)
