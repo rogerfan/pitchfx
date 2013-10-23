@@ -45,12 +45,22 @@ def dl_pitchfx_data(startdate, enddate, loc):
 def _confirm_regular_game(url):
     '''Check that a game exists and that it is a regular season game.'''
 
-    # check if game exists at all, as duplicate entries with no data exist
-    # choose what to check with, probably if bocscore.xml or game.xml exist
+    r = requests.get(url)
+    if r.status_code == 404:
+        raise Error404(url)
 
-    # use game_type in linescore.xml to check for if it's a regular season game
-    # real games have game_type == "R"
+    if not "boxscore.xml" in r.text:
+        return False
 
+    r = requests.get(url + "/linescore.xml")
+    if r.status_code == 404:
+        raise Error404(url)
+
+    root = ET.fromstring(r.content)
+    if not root.attrib['game_type'] == 'R':
+        return False 
+
+    return True
 
 def _dl_game_data(url_loc, loc, gamename):
     '''Download all game data.'''
@@ -130,7 +140,11 @@ def main():
     gamename = "gid_2012_06_15_bosmlb_chnmlb_1"
 
     _create_folder(loc)
-    _dl_game_data(url_loc, loc, gamename)
+    # _dl_game_data(url_loc, loc, gamename)
+
+    print(_confirm_regular_game(urljoin(url_loc, gamename)))
+    print(_confirm_regular_game("http://gd2.mlb.com/components/game/mlb/year_2012/month_10/day_10/gid_2012_10_10_detmlb_adtmlb_1"))
+    print(_confirm_regular_game("http://gd2.mlb.com/components/game/mlb/year_2012/month_07/day_10/gid_2012_07_10_nasmlb_aasmlb_1"))
 
     print("Done.")
 
