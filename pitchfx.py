@@ -1,8 +1,7 @@
-import os, sys, re
+import os, sys, time, re, threading
 from datetime import date, timedelta as td
-from time import sleep
-from urllib.parse import urljoin
 import xml.etree.cElementTree as ET
+from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
@@ -39,24 +38,21 @@ def dl_pitchfx_data(startdate, enddate, loc):
         # error handling: delete entire day's folder if Error404
 
 
-
-
-
 def _confirm_regular_game(url):
     '''Check that a game exists and that it is a regular season game.'''
 
-    r = requests.get(url)
+    r = requests.get(url, timeout=10)
     if r.status_code == 404:
         raise Error404(url)
 
     if not "boxscore.xml" in r.text:
         return False
 
-    r = requests.get(url + "/linescore.xml")
+    r = requests.get(url + "/linescore.xml", timeout=10)
     if r.status_code == 404:
         raise Error404(url)
 
-    root = ET.fromstring(r.content)
+    root = ET.fromstring(r.text)
     if not root.attrib['game_type'] == 'R':
         return False 
 
@@ -74,62 +70,82 @@ def _dl_game_data(url_loc, loc, gamename):
     _create_folder(batterloc)
     _create_folder(pitcherloc)
 
-    sys.stdout.write("Downloading data for game: " + gamename)
+    time1 = time.clock()
+    sys.stdout.write("Downloading: {:<35}".format(gamename))
     sys.stdout.flush()
 
     try:
-        _dl_game_data_part(gameurl + "/boxscore.xml", gameloc, "boxscore.xml")
-        _dl_game_data_part(gameurl + "/game.xml"    , gameloc, "game.xml")
-        _dl_game_data_part(gameurl + "/players.xml" , gameloc, "players.xml")
-        _dl_game_data_part(gameurl + "/inning/inning_all.xml" , gameloc, 
-                           "inning_all.xml")
+        threads = []
+        plists = {}
 
-        batterlist  = _get_playerlist(gameurl + "/batters/")
-        pitcherlist = _get_playerlist(gameurl + "/pitchers/")
+        for ptype in ("batters", "pitchers"):
+            thread = threading.Thread(
+                target=_get_url, args=("{}/{}".format(gameurl, ptype), plists),
+                kwargs={'key':ptype})
+            thread.start()
+            threads.append(thread)
 
-        for batter in batterlist:
-            _dl_game_data_part(gameurl + "/batters/" + batter, batterloc, batter)
-        for pitcher in pitcherlist:
-            _dl_game_data_part(gameurl + "/pitchers/" + pitcher, pitcherloc, pitcher)
+        for thread in threads:
+            thread.join()
+
+        for ptype in ("batters", "pitchers"):
+            soup = BeautifulSoup(plists[ptype])
+            playerlist_raw = soup.find_all('a', href=re.compile("[0-9]*\.xml"))
+            plists[ptype] = [x.contents[0].strip(' ') for x in playerlist_raw]
+
+        urllist = ["{}{}.xml".format(gameurl, item) for item in 
+            ("/boxscore", "/game", "/players", "/inning/inning_all")]
+        loclist = ["{}{}.xml".format(gameloc, item) for item in
+            ("/boxscore", "/game", "/players", "/inning_all")]
+
+        for ptype in ("batters", "pitchers"):
+            urllist_t = ["{}/{}/{}".format(gameurl, ptype, item) for item in 
+                plists[ptype]]
+            loclist_t = ["{}/{}/{}".format(gameloc, ptype, item) for item in 
+                plists[ptype]]
+            urllist.extend(urllist_t)
+            loclist.extend(loclist_t)
+
+        threads = []
+        xmldict = {}
+        loc_gen = ((urllist[i], loclist[i]) for i in range(len(urllist)))
+
+        for (xmlurl, xmlloc) in loc_gen:
+            thread = threading.Thread(target=_get_url, args=(xmlurl, xmldict),
+                kwargs={'key':xmlloc})
+            thread.start()
+            threads.append(thread)
+
+        for thread in threads:
+            thread.join()
+
+        for xmlloc, xmlval in xmldict.items():
+            with open(xmlloc, 'w') as file_:
+                file_.write(xmlval)
+
     except Error404:
         print("\nData cannot be found for game: " + gamename)
         raise
-
-    print("    ==> Done.")
-
-def _dl_game_data_part(url, loc, filename):
-    '''Download a game data piece.'''
-
-    r = requests.get(url)
-    if r.status_code == 404:
-        raise Error404(url)
     
-    with open(os.path.join(loc, filename), 'w') as file_:
-        file_.write(r.text)
+    print("==> Done ({:5.2f} sec)".format(time.clock() - time1))
 
-def _get_playerlist(url):
-    '''Create a list of player .xml files at a url.'''
-    
-    r = requests.get(url)
+def _get_url(url, data, key=False):
+    '''Load url contents.'''
+
+    r = requests.get(url, timeout=10)
     if r.status_code == 404:
         raise Error404(url)
 
-    soup = BeautifulSoup(r.text)
-    playerlist_raw = soup.find_all('a', href=re.compile("[0-9]*\.xml"))
-    playerlist = [x.contents[0].strip(' ') for x in playerlist_raw]
-
-    return playerlist
-
-def _get_gamelist(url):
-    '''Create a list of game folders at a url.'''
-    pass
+    if key:
+        data.update({key: r.text})
+    else:
+        data.append(r.text)
 
 def _create_folder(path):
     if not os.path.isdir(path):
         os.mkdir(path)
 
 class Error404(Exception):
-    '''Exception raised for 404 errors.'''
     pass
 
 
@@ -141,16 +157,14 @@ def main():
     gamename = "gid_2012_06_15_bosmlb_chnmlb_1"
 
     _create_folder(loc)
-    # _dl_game_data(url_loc, loc, gamename)
+    _dl_game_data(url_loc, loc, gamename)
 
     print(_confirm_regular_game(urljoin(url_loc, gamename)))
     print(_confirm_regular_game("http://gd2.mlb.com/components/game/mlb/year_2012/month_10/day_10/gid_2012_10_10_detmlb_adtmlb_1"))
     print(_confirm_regular_game("http://gd2.mlb.com/components/game/mlb/year_2012/month_07/day_10/gid_2012_07_10_nasmlb_aasmlb_1"))
 
+
     print("Done.")
 
 if __name__ == "__main__":
     main()
-
-
-
