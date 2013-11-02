@@ -17,7 +17,7 @@ def dl_pitchfx_data(startdate, enddate, loc):
         Date as string, formatted as "YYYY/MM/DD".
     enddate : str
         Date as string, formatted as "YYYY/MM/DD". Use None to use
-        current date as end date.
+        yesterday as the end date.
     loc : str
         Directory to download data to.
 
@@ -44,8 +44,11 @@ def _confirm_regular_game(url):
     '''Check that a game exists and that it is a regular season game.'''
 
     # Check if game exists.
-    game_text = _get_url(url)
-    if not "boxscore.xml" in game_text: return False
+    try:
+        game_text = _get_url(url)
+        if not "boxscore.xml" in game_text: return False
+    except Error404:
+        return False
 
     # Check game is a regular season game.
     linescore_text = _get_url(url + "/linescore.xml")
@@ -145,7 +148,8 @@ class Error404(Exception):
 def main():
     '''Script for testing.'''
 
-    loc = "M:/Libraries/Documents/Code/Python/Baseball/Data/test/"
+    # loc = "M:/Libraries/Documents/Code/Python/Baseball/Data/test/"
+    loc = "/home/rogerfan/Documents_Local/pitchfx/Data/test/"
     url_loc = "http://gd2.mlb.com/components/game/mlb/year_2012/month_06/day_15/"
     gamename = "gid_2012_06_15_bosmlb_chnmlb_1"
 
