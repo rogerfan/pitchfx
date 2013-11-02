@@ -1,4 +1,4 @@
-import os, sys, time, re, threading
+import os, sys, time, re
 import concurrent.futures
 from datetime import date, timedelta as td
 import xml.etree.cElementTree as ET
