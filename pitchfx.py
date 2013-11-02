@@ -43,16 +43,18 @@ def dl_pitchfx_data(startdate, enddate, loc):
 def _confirm_regular_game(url):
     '''Check that a game exists and that it is a regular season game.'''
 
+    # Check if game exists.
     game_text = _get_url(url)
     if not "boxscore.xml" in game_text: return False
 
+    # Check game is a regular season game.
     linescore_text = _get_url(url + "/linescore.xml")
     root = ET.fromstring(linescore_text)
     if not root.attrib['game_type'] == 'R': return False 
 
     return True
 
-def _dl_game_data(url_loc, loc, gamename, timeout=10):
+def _dl_game_data(url_loc, loc, gamename, max_workers=30, timeout=10):
     '''Download all game data.'''
 
     # Combine URLs and location paths
@@ -75,11 +77,11 @@ def _dl_game_data(url_loc, loc, gamename, timeout=10):
         # Download and parse player lists
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
             f_plists = {ex.submit(_get_url, "{}/{}".format(gameurl, ptype),
-                timeout=timeout): ptype 
-                for ptype in ("batters", "pitchers")}
+                timeout=timeout): ptype for ptype in
+                ("batters", "pitchers")}
 
-        plists = {f_plists[future]: future.result() for future 
-            in concurrent.futures.as_completed(f_plists)}
+        plists = {f_plists[future]: future.result() for future in
+            concurrent.futures.as_completed(f_plists)}
 
         for ptype in ("batters", "pitchers"):
             soup = BeautifulSoup(plists[ptype])
@@ -101,12 +103,12 @@ def _dl_game_data(url_loc, loc, gamename, timeout=10):
             loclist.extend(loclist_t)
 
         # Download data
-        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
-            f_xml = {executor.submit(_get_url, xmlurl, timeout=timeout): xmlloc
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
+            f_xml = {ex.submit(_get_url, xmlurl, timeout=timeout): xmlloc
                 for (xmlloc, xmlurl) in zip(loclist, urllist)}
 
-        xmldict = {f_xml[future]: future.result() for future
-            in concurrent.futures.as_completed(f_xml)}
+        xmldict = {f_xml[future]: future.result() for future in
+            concurrent.futures.as_completed(f_xml)}
 
         # Save data
         for xmlloc, xmlval in xmldict.items():
@@ -143,13 +145,12 @@ def main():
     url_loc = "http://gd2.mlb.com/components/game/mlb/year_2012/month_06/day_15/"
     gamename = "gid_2012_06_15_bosmlb_chnmlb_1"
 
-    # _create_folder(loc)
-    # _dl_game_data(url_loc, loc, gamename)
+    _create_folder(loc)
+    _dl_game_data(url_loc, loc, gamename)
 
     print(_confirm_regular_game(urljoin(url_loc, gamename)))
     print(_confirm_regular_game("http://gd2.mlb.com/components/game/mlb/year_2012/month_10/day_10/gid_2012_10_10_detmlb_adtmlb_1"))
     print(_confirm_regular_game("http://gd2.mlb.com/components/game/mlb/year_2012/month_07/day_10/gid_2012_07_10_nasmlb_aasmlb_1"))
-
 
     print("Done.")
 
