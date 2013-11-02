@@ -1,4 +1,5 @@
 import os, sys, time, re, threading
+import concurrent.futures
 from datetime import date, timedelta as td
 import xml.etree.cElementTree as ET
 from urllib.parse import urljoin
@@ -58,41 +59,41 @@ def _confirm_regular_game(url):
 
     return True
 
-def _dl_game_data(url_loc, loc, gamename):
+def _dl_game_data(url_loc, loc, gamename, timeout=10):
     '''Download all game data.'''
 
+    # Combine URLs and location paths
     gameurl    = urljoin(url_loc, gamename)
     gameloc    = os.path.join(loc, gamename)
     batterloc  = os.path.join(gameloc, "batters")
     pitcherloc = os.path.join(gameloc, "pitchers")
 
+    # Create folders
     _create_folder(gameloc)
     _create_folder(batterloc)
     _create_folder(pitcherloc)
 
+    # Timing and printing
     time1 = time.clock()
     sys.stdout.write("Downloading: {:<35}".format(gamename))
     sys.stdout.flush()
 
     try:
-        threads = []
-        plists = {}
+        # Download and parse player lists
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+            f_plists = {ex.submit(_get_url, "{}/{}".format(gameurl, ptype),
+                timeout=timeout): ptype 
+                for ptype in ("batters", "pitchers")}
 
-        for ptype in ("batters", "pitchers"):
-            thread = threading.Thread(
-                target=_get_url, args=("{}/{}".format(gameurl, ptype), plists),
-                kwargs={'key':ptype})
-            thread.start()
-            threads.append(thread)
-
-        for thread in threads:
-            thread.join()
+        plists = {f_plists[future]: future.result() for future 
+            in concurrent.futures.as_completed(f_plists)}
 
         for ptype in ("batters", "pitchers"):
             soup = BeautifulSoup(plists[ptype])
             playerlist_raw = soup.find_all('a', href=re.compile("[0-9]*\.xml"))
             plists[ptype] = [x.contents[0].strip(' ') for x in playerlist_raw]
 
+        # Create URL and location path lists
         urllist = ["{}{}.xml".format(gameurl, item) for item in 
             ("/boxscore", "/game", "/players", "/inning/inning_all")]
         loclist = ["{}{}.xml".format(gameloc, item) for item in
@@ -106,19 +107,15 @@ def _dl_game_data(url_loc, loc, gamename):
             urllist.extend(urllist_t)
             loclist.extend(loclist_t)
 
-        threads = []
-        xmldict = {}
-        loc_gen = ((urllist[i], loclist[i]) for i in range(len(urllist)))
+        # Download data
+        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
+            f_xml = {executor.submit(_get_url, xmlurl, timeout=timeout): xmlloc
+                for (xmlloc, xmlurl) in zip(loclist, urllist)}
 
-        for (xmlurl, xmlloc) in loc_gen:
-            thread = threading.Thread(target=_get_url, args=(xmlurl, xmldict),
-                kwargs={'key':xmlloc})
-            thread.start()
-            threads.append(thread)
+        xmldict = {f_xml[future]: future.result() for future
+            in concurrent.futures.as_completed(f_xml)}
 
-        for thread in threads:
-            thread.join()
-
+        # Save data
         for xmlloc, xmlval in xmldict.items():
             with open(xmlloc, 'w') as file_:
                 file_.write(xmlval)
@@ -129,17 +126,14 @@ def _dl_game_data(url_loc, loc, gamename):
     
     print("==> Done ({:5.2f} sec)".format(time.clock() - time1))
 
-def _get_url(url, data, key=False):
+def _get_url(url, timeout=10):
     '''Load url contents.'''
-
-    r = requests.get(url, timeout=10)
+    
+    r = requests.get(url, timeout=timeout)
     if r.status_code == 404:
         raise Error404(url)
-
-    if key:
-        data.update({key: r.text})
-    else:
-        data.append(r.text)
+    
+    return r.text
 
 def _create_folder(path):
     if not os.path.isdir(path):
@@ -159,9 +153,9 @@ def main():
     _create_folder(loc)
     _dl_game_data(url_loc, loc, gamename)
 
-    print(_confirm_regular_game(urljoin(url_loc, gamename)))
-    print(_confirm_regular_game("http://gd2.mlb.com/components/game/mlb/year_2012/month_10/day_10/gid_2012_10_10_detmlb_adtmlb_1"))
-    print(_confirm_regular_game("http://gd2.mlb.com/components/game/mlb/year_2012/month_07/day_10/gid_2012_07_10_nasmlb_aasmlb_1"))
+    # print(_confirm_regular_game(urljoin(url_loc, gamename)))
+    # print(_confirm_regular_game("http://gd2.mlb.com/components/game/mlb/year_2012/month_10/day_10/gid_2012_10_10_detmlb_adtmlb_1"))
+    # print(_confirm_regular_game("http://gd2.mlb.com/components/game/mlb/year_2012/month_07/day_10/gid_2012_07_10_nasmlb_aasmlb_1"))
 
 
     print("Done.")
