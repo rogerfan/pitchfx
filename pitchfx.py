@@ -34,6 +34,7 @@ def dl_pitchfx_data(startdate, enddate, loc):
         # check date url exists
         # create list of games on that date
         # confirm regular game for each game
+            # parallelize this with a filter of sorts using _confirm_reg_game?
         # download each game
 
         # error handling: delete entire day's folder if Error404
@@ -42,20 +43,12 @@ def dl_pitchfx_data(startdate, enddate, loc):
 def _confirm_regular_game(url):
     '''Check that a game exists and that it is a regular season game.'''
 
-    r = requests.get(url, timeout=10)
-    if r.status_code == 404:
-        raise Error404(url)
+    game_text = _get_url(url)
+    if not "boxscore.xml" in game_text: return False
 
-    if not "boxscore.xml" in r.text:
-        return False
-
-    r = requests.get(url + "/linescore.xml", timeout=10)
-    if r.status_code == 404:
-        raise Error404(url)
-
-    root = ET.fromstring(r.text)
-    if not root.attrib['game_type'] == 'R':
-        return False 
+    linescore_text = _get_url(url + "/linescore.xml")
+    root = ET.fromstring(linescore_text)
+    if not root.attrib['game_type'] == 'R': return False 
 
     return True
 
@@ -150,12 +143,12 @@ def main():
     url_loc = "http://gd2.mlb.com/components/game/mlb/year_2012/month_06/day_15/"
     gamename = "gid_2012_06_15_bosmlb_chnmlb_1"
 
-    _create_folder(loc)
-    _dl_game_data(url_loc, loc, gamename)
+    # _create_folder(loc)
+    # _dl_game_data(url_loc, loc, gamename)
 
-    # print(_confirm_regular_game(urljoin(url_loc, gamename)))
-    # print(_confirm_regular_game("http://gd2.mlb.com/components/game/mlb/year_2012/month_10/day_10/gid_2012_10_10_detmlb_adtmlb_1"))
-    # print(_confirm_regular_game("http://gd2.mlb.com/components/game/mlb/year_2012/month_07/day_10/gid_2012_07_10_nasmlb_aasmlb_1"))
+    print(_confirm_regular_game(urljoin(url_loc, gamename)))
+    print(_confirm_regular_game("http://gd2.mlb.com/components/game/mlb/year_2012/month_10/day_10/gid_2012_10_10_detmlb_adtmlb_1"))
+    print(_confirm_regular_game("http://gd2.mlb.com/components/game/mlb/year_2012/month_07/day_10/gid_2012_07_10_nasmlb_aasmlb_1"))
 
 
     print("Done.")
