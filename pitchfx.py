@@ -1,68 +1,147 @@
 import os, sys, time, re
+import datetime as dt
 import concurrent.futures
-from datetime import date, timedelta as td
 import xml.etree.cElementTree as ET
-from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup
 
 
-def dl_pitchfx_data(startdate, enddate, loc):
+def dl_pitchfx_data(dates, loc, date_list=False, max_workers=30, timeout=20,
+                    sleep=1):
     '''Download all regular season pitch f/x data for a given date range.
 
     Arguments
     ---------
-    startdate : str
-        Date as string, formatted as "YYYY/MM/DD".
-    enddate : str
-        Date as string, formatted as "YYYY/MM/DD". Use None to use
-        yesterday as the end date.
+    dates : list of strings
+        List of strings formatted as "YYYY-MM-DD".
+        If len(dates) == 2 they are used as the endpoints of a range.
+        If len(dates) == 1 it is used as the startdate and the enddate is set to
+        the day before the current day.
     loc : str
         Directory to download data to.
+    date_list=False: bool
+        If True, treats dates as a list of dates rather than range endpoints.
+    max_workers=30: int
+        Maximum threads to use when downloading data.
+    timeout=20: float
+        Timeout in seconds for http requests.
+    sleep=1: float
+        Time in seconds to sleep between game downloads.
 
     '''
 
-    # handle dates, including if enddate = None
+    # Handle dates
+    if not date_list:
+        dlen = len(dates)
+        if dlen == 0:
+            raise ValueError("Requires at least one date.")
+        if dlen > 2:
+            raise ValueError("Too many dates. Set date_list=True?")
 
-    # create list of days in between
+        d1 = dt.datetime.strptime(dates[0], "%Y-%m-%d").date()
+        if dlen == 1:
+            d2 = dt.date.today() - dt.timedelta(days=1)
+        else:
+            d2 = dt.datetime.strptime(dates[1], "%Y-%m-%d").date()
+        dlist = [d1 + dt.timedelta(days=i) for i in range((d2-d1).days + 1)]
+    else:
+        dlist = [dt.datetime.strptime(date, "%Y-%m-%d").date()
+                 for date in dates]
 
-    # iterate over dates
-        # create month folder
-        # create day folder
+    # Misc
+    baseurl  = "http://gd2.mlb.com/components/game/mlb"
+    tagmatch = re.compile("gid[0-9a-zA-Z_]+/")
+    problems = []
 
-        # check date url exists
-        # create list of games on that date
-        # confirm regular game for each game
-            # parallelize this with a filter of sorts using _confirm_reg_game?
-        # download each game
+    for date in dlist:
 
-        # error handling: delete entire day's folder if Error404
+        # Extract date components
+        yr = str(date.year)
+        mn = str(date.month).zfill(2)
+        dy = str(date.day).zfill(2)
+
+        # Create folder
+        dayloc = os.path.join(loc, yr, mn, dy)
+        _create_folder(dayloc)
+
+        # Access date URL
+        dayurl = baseurl + "/year_{}/month_{}/day_{}".format(yr, mn, dy)
+
+        try:
+            page = _get_url(dayurl, timeout=timeout)
+        except Error404:
+            continue    # Continue to next date
+        except requests.exceptions.Timeout:
+            print(" !!! HTTP Timeout {}: {}".format(timeout, date))
+            problems.append(date)
+            continue
+
+        # Create list of games on that date
+        soup = BeautifulSoup(page)
+        glist_raw = soup.find_all('a', href=tagmatch)
+        glist = [x.contents[0].strip(' /') for x in glist_raw]
+
+        # Condition on regular games
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=20) as ex:
+                f_reggame = {ex.submit(_confirm_regular_game, "{}/{}".format(
+                             dayurl, game), timeout=timeout): game for game in
+                             glist}
+
+            reggame = {f_reggame[future]: future.result() for future in
+                       concurrent.futures.as_completed(f_reggame)}
+        except requests.exceptions.Timeout:
+            print(" !!! HTTP Timeout {}: {}".format(timeout, date))
+            problems.append(date)
+            continue
+
+        glist = [game for game, reg in reggame.items() if reg]
+        num = len(glist)
+
+        # Download game data
+        try:
+            for i, game in enumerate(glist):
+                _dl_game_data(dayurl, dayloc, game, i=i+1, num=num,
+                              max_workers=30, timeout=timeout)
+                time.sleep(sleep)
+
+        except requests.exceptions.Timeout:
+            print(" !!! HTTP Timeout {:>2}: {}".format(timeout, date))
+            problems.append(date)
+
+    # Problems
+    if problems:
+        print("\nDates with HTTP timeouts:")
+        probformat = ',\n    '.join(str(x) for x in problems)
+        print("[\n    {}\n]".format(probformat))
 
 
-def _confirm_regular_game(url):
+def _confirm_regular_game(url, timeout=10):
     '''Check that a game exists and that it is a regular season game.'''
 
     # Check if game exists.
     try:
-        game_text = _get_url(url)
+        game_text = _get_url(url, timeout=timeout)
         if not "boxscore.xml" in game_text: return False
     except Error404:
         return False
 
     # Check game is a regular season game.
-    linescore_text = _get_url(url + "/linescore.xml")
+    linescore_text = _get_url(url + "/linescore.xml", timeout=timeout)
     root = ET.fromstring(linescore_text)
-    if not root.attrib['game_type'] == 'R': return False
+    if not root.attrib['game_type'] == 'R':
+        return False
 
     return True
 
 
-def _dl_game_data(url_loc, loc, gamename, max_workers=30, timeout=10):
-    '''Download all game data.'''
+def _dl_game_data(url_loc, loc, gamename, i="", num="",
+                  max_workers=30, timeout=10):
+    '''Download game data.'''
 
     # Combine URLs and location paths
-    gameurl    = urljoin(url_loc, gamename)
+    gameurl    = "{}/{}".format(url_loc, gamename)
     gameloc    = os.path.join(loc, gamename)
     batterloc  = os.path.join(gameloc, "batters")
     pitcherloc = os.path.join(gameloc, "pitchers")
@@ -73,8 +152,8 @@ def _dl_game_data(url_loc, loc, gamename, max_workers=30, timeout=10):
     _create_folder(pitcherloc)
 
     # Timing and printing
-    time1 = time.clock()
-    sys.stdout.write("Downloading: {:<35}".format(gamename))
+    time1 = time.time()
+    sys.stdout.write("Downloading: {:<30} {:>2}/{:<2}".format(gamename, i, num))
     sys.stdout.flush()
 
     try:
@@ -123,7 +202,7 @@ def _dl_game_data(url_loc, loc, gamename, max_workers=30, timeout=10):
         print("\nData cannot be found for game: " + gamename)
         raise
 
-    print("==> Done ({:5.2f} sec)".format(time.clock() - time1))
+    print(" ==> Done ({:5.2f} sec)".format(time.time() - time1))
 
 
 def _get_url(url, timeout=10):
@@ -138,7 +217,7 @@ def _get_url(url, timeout=10):
 
 def _create_folder(path):
     if not os.path.isdir(path):
-        os.mkdir(path)
+        os.makedirs(path)
 
 
 class Error404(Exception):
@@ -150,17 +229,29 @@ def main():
 
     # loc = "M:/Libraries/Documents/Code/Python/Baseball/Data/test/"
     loc = "/home/rogerfan/Documents_Local/pitchfx/Data/test/"
-    url_loc = "http://gd2.mlb.com/components/game/mlb/year_2012/month_06/day_15/"
-    gamename = "gid_2012_06_15_bosmlb_chnmlb_1"
+    # url_loc = "http://gd2.mlb.com/components/game/mlb/year_2012/month_06/day_15/"
+    # gamename = "gid_2012_06_15_bosmlb_chnmlb_1"
 
     _create_folder(loc)
-    _dl_game_data(url_loc, loc, gamename)
+    # _dl_game_data(url_loc, loc, gamename)
 
-    print(_confirm_regular_game(urljoin(url_loc, gamename)))
-    print(_confirm_regular_game('''http://gd2.mlb.com/components/game/mlb/year_2012/
-month_10/day_10/gid_2012_10_10_detmlb_adtmlb_1'''))
-    print(_confirm_regular_game('''http://gd2.mlb.com/components/game/mlb/year_2012/
-month_07/day_10/gid_2012_07_10_nasmlb_aasmlb_1'''))
+#     print(_confirm_regular_game(urljoin(url_loc, gamename)))
+#     print(_confirm_regular_game('''http://gd2.mlb.com/components/game/mlb/
+# year_2012/month_10/day_10/gid_2012_10_10_detmlb_adtmlb_1'''))
+#     print(_confirm_regular_game('''http://gd2.mlb.com/components/game/mlb/
+# year_2012/month_07/day_10/gid_2012_07_10_nasmlb_aasmlb_1'''))
+
+    dl_pitchfx_data(("2012-08-18", "2012-08-23"), loc, date_list=False,
+                    max_workers=50, timeout=10, sleep=5)
+    # dl_pitchfx_data(
+    #     [
+    #         "2012-08-26",
+    #         "2012-08-28",
+    #         "2012-08-29",
+    #         "2012-09-08",
+    #         "2012-09-09"
+    #     ],
+    #     loc, date_list=True, max_workers=50, timeout=10, sleep=5)
 
     print("Done.")
 
