@@ -7,8 +7,21 @@ import requests
 from bs4 import BeautifulSoup
 
 
+def main():
+    '''Script for testing.'''
+
+    # loc = "M:/Libraries/Documents/Code/Python/Baseball/Data/test/"
+    loc = "/home/rogerfan/Documents_Local/pitchfx/Data/test/"
+    _create_folder(loc)
+
+    dl_pitchfx_data(("2012-09-15", "2012-09-17"), loc, date_list=False,
+                    max_workers=50, timeout=20, sleep=5, retry=True)
+
+    print("Done.")
+
+
 def dl_pitchfx_data(dates, loc, date_list=False, max_workers=30, timeout=20,
-                    sleep=1):
+                    sleep=1, retry=False):
     '''Download all regular season pitch f/x data for a given date range.
 
     Arguments
@@ -28,6 +41,8 @@ def dl_pitchfx_data(dates, loc, date_list=False, max_workers=30, timeout=20,
         Timeout in seconds for http requests.
     sleep=1: float
         Time in seconds to sleep between game downloads.
+    retry=False: bool
+        Retry downloading problem dates until all dates are successfully dled.
 
     '''
 
@@ -111,10 +126,16 @@ def dl_pitchfx_data(dates, loc, date_list=False, max_workers=30, timeout=20,
             problems.append(date)
 
     # Problems
+    problems = [str(x) for x in problems]
     if problems:
         print("\nDates with HTTP timeouts:")
-        probformat = ',\n    '.join(str(x) for x in problems)
+        probformat = ',\n    '.join(problems)
         print("[\n    {}\n]".format(probformat))
+
+        if retry:
+            print("\nRetrying dates with HTTP timeouts.")
+            dl_pitchfx_data(problems, loc, date_list=True, max_workers=max_workers,
+                            timeout=timeout, sleep=sleep, retry=retry)
 
 
 def _confirm_regular_game(url, timeout=10):
@@ -223,37 +244,6 @@ def _create_folder(path):
 class Error404(Exception):
     pass
 
-
-def main():
-    '''Script for testing.'''
-
-    # loc = "M:/Libraries/Documents/Code/Python/Baseball/Data/test/"
-    loc = "/home/rogerfan/Documents_Local/pitchfx/Data/test/"
-    # url_loc = "http://gd2.mlb.com/components/game/mlb/year_2012/month_06/day_15/"
-    # gamename = "gid_2012_06_15_bosmlb_chnmlb_1"
-
-    _create_folder(loc)
-    # _dl_game_data(url_loc, loc, gamename)
-
-#     print(_confirm_regular_game(urljoin(url_loc, gamename)))
-#     print(_confirm_regular_game('''http://gd2.mlb.com/components/game/mlb/
-# year_2012/month_10/day_10/gid_2012_10_10_detmlb_adtmlb_1'''))
-#     print(_confirm_regular_game('''http://gd2.mlb.com/components/game/mlb/
-# year_2012/month_07/day_10/gid_2012_07_10_nasmlb_aasmlb_1'''))
-
-    dl_pitchfx_data(("2012-08-18", "2012-08-23"), loc, date_list=False,
-                    max_workers=50, timeout=10, sleep=5)
-    # dl_pitchfx_data(
-    #     [
-    #         "2012-08-26",
-    #         "2012-08-28",
-    #         "2012-08-29",
-    #         "2012-09-08",
-    #         "2012-09-09"
-    #     ],
-    #     loc, date_list=True, max_workers=50, timeout=10, sleep=5)
-
-    print("Done.")
 
 if __name__ == "__main__":
     main()
