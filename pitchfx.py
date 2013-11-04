@@ -14,7 +14,7 @@ def main():
     loc = "/home/rogerfan/Documents_Local/pitchfx/Data/test/"
     _create_folder(loc)
 
-    dl_pitchfx_data(("2012-09-15", "2012-09-17"), loc, date_list=False,
+    dl_pitchfx_data(("2012-09-18", "2012-09-20"), loc, date_list=False,
                     max_workers=50, timeout=20, sleep=5, retry=True)
 
     print("Done.")
@@ -49,16 +49,12 @@ def dl_pitchfx_data(dates, loc, date_list=False, max_workers=30, timeout=20,
     # Handle dates
     if not date_list:
         dlen = len(dates)
-        if dlen == 0:
-            raise ValueError("Requires at least one date.")
-        if dlen > 2:
-            raise ValueError("Too many dates. Set date_list=True?")
+        if dlen == 0: raise ValueError("Requires at least one date.")
+        if dlen  > 2: raise ValueError("Too many dates. Set date_list=True?")
 
         d1 = dt.datetime.strptime(dates[0], "%Y-%m-%d").date()
-        if dlen == 1:
-            d2 = dt.date.today() - dt.timedelta(days=1)
-        else:
-            d2 = dt.datetime.strptime(dates[1], "%Y-%m-%d").date()
+        if dlen == 1: d2 = dt.date.today() - dt.timedelta(days=1)
+        if dlen == 2: d2 = dt.datetime.strptime(dates[1], "%Y-%m-%d").date()
         dlist = [d1 + dt.timedelta(days=i) for i in range((d2-d1).days + 1)]
     else:
         dlist = [dt.datetime.strptime(date, "%Y-%m-%d").date()
@@ -81,23 +77,22 @@ def dl_pitchfx_data(dates, loc, date_list=False, max_workers=30, timeout=20,
         _create_folder(dayloc)
 
         # Access date URL
-        dayurl = baseurl + "/year_{}/month_{}/day_{}".format(yr, mn, dy)
+        dayurl = "{}/year_{}/month_{}/day_{}".format(baseurl, yr, mn, dy)
 
         try:
             page = _get_url(dayurl, timeout=timeout)
         except Error404:
-            continue    # Continue to next date
+            continue
         except requests.exceptions.Timeout:
             print(" !!! HTTP Timeout {}: {}".format(timeout, date))
             problems.append(date)
             continue
 
         # Create list of games on that date
-        soup = BeautifulSoup(page)
-        glist_raw = soup.find_all('a', href=tagmatch)
-        glist = [x.contents[0].strip(' /') for x in glist_raw]
+        glist = BeautifulSoup(page).find_all('a', href=tagmatch)
+        glist = [x.contents[0].strip(' /') for x in glist]
 
-        # Condition on regular games
+        # Select only regular games
         try:
             with concurrent.futures.ThreadPoolExecutor(max_workers=20) as ex:
                 f_reggame = {ex.submit(_confirm_regular_game, "{}/{}".format(
@@ -123,14 +118,12 @@ def dl_pitchfx_data(dates, loc, date_list=False, max_workers=30, timeout=20,
 
         except requests.exceptions.Timeout:
             print(" !!! HTTP Timeout {:>2}: {}".format(timeout, date))
-            problems.append(date)
+            problems.append(str(date))
 
     # Problems
-    problems = [str(x) for x in problems]
     if problems:
-        print("\nDates with HTTP timeouts:")
         probformat = ',\n    '.join(problems)
-        print("[\n    {}\n]".format(probformat))
+        print("\nDates with HTTP timeouts:\n[\n    {}\n]".format(probformat))
 
         if retry:
             print("\nRetrying dates with HTTP timeouts.")
