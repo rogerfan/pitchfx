@@ -14,13 +14,13 @@ def main():
     loc = "/home/rogerfan/Documents_Local/pitchfx/Data/test/"
     _create_folder(loc)
 
-    dl_pitchfx_data(("2012-09-18", "2012-09-20"), loc, date_list=False,
-                    max_workers=50, timeout=20, sleep=5, retry=True)
+    dl_pitchfx_data(("2012-09-20", "2012-09-20"), loc, date_list=False,
+                    max_workers=50, timeout=10, sleep=1, retry=True)
 
     print("Done.")
 
 
-def dl_pitchfx_data(dates, loc, date_list=False, max_workers=30, timeout=20,
+def dl_pitchfx_data(dates, loc, date_list=False, max_workers=30, timeout=10,
                     sleep=1, retry=False):
     '''Download all regular season pitch f/x data for a given date range.
 
@@ -29,9 +29,8 @@ def dl_pitchfx_data(dates, loc, date_list=False, max_workers=30, timeout=20,
     dates : list of strings
         List of strings formatted as "YYYY-MM-DD".
         If len(dates) == 2 they are used as the endpoints of a range.
-        If len(dates) == 1 it is used as the startdate and the enddate is set to
-        the day before the current day.
-    loc : str
+        If len(dates) == 1 it is used as the startdate and the enddate is set
+        to the day before the current day. loc : str
         Directory to download data to.
     date_list=False: bool
         If True, treats dates as a list of dates rather than range endpoints.
@@ -134,15 +133,20 @@ def dl_pitchfx_data(dates, loc, date_list=False, max_workers=30, timeout=20,
 def _confirm_regular_game(url, timeout=10):
     '''Check that a game exists and that it is a regular season game.'''
 
+    s = requests.Session()
+
     # Check if game exists.
     try:
-        game_text = _get_url(url, timeout=timeout)
+        game_text = _get_url(url, session=s, timeout=timeout)
         if not "boxscore.xml" in game_text: return False
     except Error404:
+        s.close()
         return False
 
     # Check game is a regular season game.
-    linescore_text = _get_url(url + "/linescore.xml", timeout=timeout)
+    linescore_text = _get_url(url + "/linescore.xml", session=s, timeout=timeout)
+    s.close()
+
     root = ET.fromstring(linescore_text)
     if not root.attrib['game_type'] == 'R':
         return False
@@ -170,11 +174,14 @@ def _dl_game_data(url_loc, loc, gamename, i="", num="",
     sys.stdout.write("Downloading: {:<30} {:>2}/{:<2}".format(gamename, i, num))
     sys.stdout.flush()
 
+    # Create Requests Session
+    s = requests.Session()
+
     try:
         # Download and parse player lists
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
             f_plists = {ex.submit(_get_url, "{}/{}".format(gameurl, ptype),
-                        timeout=timeout): ptype for ptype in
+                        session=s, timeout=timeout): ptype for ptype in
                         ("batters", "pitchers")}
 
         plists = {f_plists[future]: future.result() for future in
@@ -201,8 +208,8 @@ def _dl_game_data(url_loc, loc, gamename, i="", num="",
 
         # Download data
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
-            f_xml = {ex.submit(_get_url, xmlurl, timeout=timeout): xmlloc
-                     for (xmlloc, xmlurl) in zip(loclist, urllist)}
+            f_xml = {ex.submit(_get_url, xmlurl, session=s, timeout=timeout):
+                     xmlloc for (xmlloc, xmlurl) in zip(loclist, urllist)}
 
         xmldict = {f_xml[future]: future.result() for future in
                    concurrent.futures.as_completed(f_xml)}
@@ -216,13 +223,21 @@ def _dl_game_data(url_loc, loc, gamename, i="", num="",
         print("\nData cannot be found for game: " + gamename)
         raise
 
+    finally:
+        s.close()
+
     print(" ==> Done ({:5.2f} sec)".format(time.time() - time1))
 
 
-def _get_url(url, timeout=10):
+def _get_url(url, session=None, timeout=10):
     '''Load url contents.'''
 
-    r = requests.get(url, timeout=timeout)
+    if session:
+        r = session.get(url, timeout=timeout)
+    else:
+        r = requests.get(url, timeout=timeout)
+        r.close()
+
     if r.status_code == 404:
         raise Error404(url)
 
