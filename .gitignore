@@ -19,8 +19,8 @@ lib
 lib64
 __pycache__
 
-*.sublime-project
-*.sublime-workspace
+# *.sublime-project
+# *.sublime-workspace
 
 # Installer logs
 pip-log.txt

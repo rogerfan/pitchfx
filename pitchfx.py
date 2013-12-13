@@ -1,6 +1,6 @@
 import os, sys, time, re
 import datetime as dt
-import concurrent.futures
+import concurrent.futures as futures
 import xml.etree.cElementTree as ET
 
 import requests
@@ -10,9 +10,8 @@ from bs4 import BeautifulSoup
 def main():
     '''Script for testing.'''
 
-    # loc = "M:/Libraries/Documents/Code/Python/Baseball/Data/test/"
-    # loc = "/home/rogerfan/Documents_Local/pitchfx/Data/test/"
     loc = "test"
+
     _create_folder(loc)
 
     dl_pitchfx_data(("2012-09-20", "2012-09-20"), loc, date_list=False,
@@ -94,13 +93,13 @@ def dl_pitchfx_data(dates, loc, date_list=False, max_workers=30, timeout=10,
 
         # Select only regular games
         try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
+            with futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
                 f_reggame = {ex.submit(_confirm_regular_game, "{}/{}".format(
                              dayurl, game), timeout=timeout): game for game in
                              glist}
 
             reggame = {f_reggame[future]: future.result() for future in
-                       concurrent.futures.as_completed(f_reggame)}
+                       futures.as_completed(f_reggame)}
         except requests.exceptions.Timeout:
             print(" !!! HTTP Timeout {}: {}".format(timeout, date))
             problems.append(date)
@@ -126,8 +125,10 @@ def dl_pitchfx_data(dates, loc, date_list=False, max_workers=30, timeout=10,
 
         if retry:
             print("\nRetrying dates with HTTP timeouts.")
-            dl_pitchfx_data(problems, loc, date_list=True, max_workers=max_workers,
-                            timeout=timeout, sleep=sleep, retry=retry)
+            dl_pitchfx_data(
+                problems, loc, date_list=True, max_workers=max_workers,
+                timeout=timeout, sleep=sleep, retry=retry
+            )
 
 
 def _confirm_regular_game(url, timeout=10):
@@ -179,13 +180,13 @@ def _dl_game_data(url_loc, loc, gamename, i="", num="",
 
     try:
         # Download and parse player lists
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+        with futures.ThreadPoolExecutor(max_workers=2) as ex:
             f_plists = {ex.submit(_get_url, "{}/{}".format(gameurl, ptype),
                         session=s, timeout=timeout): ptype for ptype in
                         ("batters", "pitchers")}
 
         plists = {f_plists[future]: future.result() for future in
-                  concurrent.futures.as_completed(f_plists)}
+                  futures.as_completed(f_plists)}
 
         for ptype in ("batters", "pitchers"):
             soup = BeautifulSoup(plists[ptype])
@@ -207,12 +208,12 @@ def _dl_game_data(url_loc, loc, gamename, i="", num="",
             loclist.extend(loclist_t)
 
         # Download data
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
+        with futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
             f_xml = {ex.submit(_get_url, xmlurl, session=s, timeout=timeout):
                      xmlloc for (xmlloc, xmlurl) in zip(loclist, urllist)}
 
         xmldict = {f_xml[future]: future.result() for future in
-                   concurrent.futures.as_completed(f_xml)}
+                   futures.as_completed(f_xml)}
 
         # Save data
         for xmlloc, xmlval in xmldict.items():
