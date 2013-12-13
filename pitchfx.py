@@ -11,7 +11,8 @@ def main():
     '''Script for testing.'''
 
     # loc = "M:/Libraries/Documents/Code/Python/Baseball/Data/test/"
-    loc = "/home/rogerfan/Documents_Local/pitchfx/Data/test/"
+    # loc = "/home/rogerfan/Documents_Local/pitchfx/Data/test/"
+    loc = "test"
     _create_folder(loc)
 
     dl_pitchfx_data(("2012-09-20", "2012-09-20"), loc, date_list=False,
@@ -93,7 +94,7 @@ def dl_pitchfx_data(dates, loc, date_list=False, max_workers=30, timeout=10,
 
         # Select only regular games
         try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=20) as ex:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as ex:
                 f_reggame = {ex.submit(_confirm_regular_game, "{}/{}".format(
                              dayurl, game), timeout=timeout): game for game in
                              glist}
@@ -112,9 +113,8 @@ def dl_pitchfx_data(dates, loc, date_list=False, max_workers=30, timeout=10,
         try:
             for i, game in enumerate(glist):
                 _dl_game_data(dayurl, dayloc, game, i=i+1, num=num,
-                              max_workers=30, timeout=timeout)
+                              max_workers=max_workers, timeout=timeout)
                 time.sleep(sleep)
-
         except requests.exceptions.Timeout:
             print(" !!! HTTP Timeout {:>2}: {}".format(timeout, date))
             problems.append(str(date))
@@ -216,7 +216,7 @@ def _dl_game_data(url_loc, loc, gamename, i="", num="",
 
         # Save data
         for xmlloc, xmlval in xmldict.items():
-            with open(xmlloc, 'w') as file_:
+            with open(xmlloc, 'w', encoding='ISO 8859-1') as file_:
                 file_.write(xmlval)
 
     except Error404:
