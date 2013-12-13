@@ -27,6 +27,11 @@ def test_create_folder():
     pitchfx._create_folder("test_folder")
     assert os.path.isdir("test_folder")
 
+@nose.tools.with_setup(setup=c_folder_func("test_folder"),
+                       teardown=d_folder_func("test_folder"))
+def test_create_folder_already_Exists():
+    pitchfx._create_folder("test_folder")
+    assert os.path.isdir("test_folder")
 
 # Testing _get_url()
 def test_get_url():
@@ -83,17 +88,25 @@ def test_confirm_springtrain_game_fail():
     assert not pitchfx._confirm_regular_game(url)
 
 
-# # Testing _dl_game_data()
-# Persistent problem with HTTP connections, but only with nosetests
-# @nose.tools.with_setup(setup=c_folder_func("test_folder"),
-#                        teardown=d_folder_func("test_folder"))
-# def test_dl_game_data():
-#     url_loc  = "http://gd2.mlb.com/components/game/mlb/year_2012/month_06/day_10/"
-#     gamename = "gid_2012_06_10_nynmlb_nyamlb_1"
-#     loc      = "test_folder"
+# Testing _dl_game_data()
+@nose.tools.with_setup(setup=c_folder_func("test_folder"),
+                       teardown=d_folder_func("test_folder"))
+def test_dl_game_data():
+    url_loc  = "http://gd2.mlb.com/components/game/mlb/year_2012/month_06/day_10/"
+    gamename = "gid_2012_06_10_nynmlb_nyamlb_1"
+    loc      = "test_folder"
 
-#     # Possible problems here, http connection pool full?
-#     pitchfx._dl_game_data(url_loc, loc, gamename, max_workers=30)
+    pitchfx._dl_game_data(url_loc, loc, gamename, max_workers=5)
 
-#     assert os.path.isdir("test_folder/batters")
-#     assert os.path.isdir("test_folder/pitchers")
+    assert os.path.isdir(loc + "/" + gamename + "/batters")
+    assert os.path.isfile(loc + "/" + gamename + "/batters/121250.xml")
+    assert os.path.isfile(loc + "/" + gamename + "/batters/579799.xml")
+
+    assert os.path.isdir(loc + "/" + gamename + "/pitchers")
+    assert os.path.isfile(loc + "/" + gamename + "/pitchers/110683.xml")
+    assert os.path.isfile(loc + "/" + gamename + "/pitchers/579799.xml")
+
+    assert os.path.isfile(loc + "/" + gamename + "/boxscore.xml")
+    assert os.path.isfile(loc + "/" + gamename + "/game.xml")
+    assert os.path.isfile(loc + "/" + gamename + "/inning_all.xml")
+    assert os.path.isfile(loc + "/" + gamename + "/players.xml")
