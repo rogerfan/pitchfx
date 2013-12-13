@@ -54,31 +54,31 @@ def test_get_url_nonexistent():
 
 # Testing _confirm_regular_game()
 def test_confirm_regular_game_pass():
-    url = ("http://gd2.mlb.com/components/game/mlb/year_2012/ +"
+    url = ("http://gd2.mlb.com/components/game/mlb/year_2012/" +
            "month_06/day_10/gid_2012_06_10_nynmlb_nyamlb_1")
     assert pitchfx._confirm_regular_game(url)
 
 
 def test_confirm_nonregular_game_fail():
-    url = ("http://gd2.mlb.com/components/game/mlb/year_2012/ +"
+    url = ("http://gd2.mlb.com/components/game/mlb/year_2012/" +
            "month_06/day_10/gid_2012_06_10_tbamlb_flomlb_1")
     assert not pitchfx._confirm_regular_game(url)
 
 
 def test_confirm_playoff_game_fail():
-    url = ("http://gd2.mlb.com/components/game/mlb/year_2012/ +"
+    url = ("http://gd2.mlb.com/components/game/mlb/year_2012/" +
            "month_10/day_06/gid_2012_10_06_oakmlb_detmlb_1/")
     assert not pitchfx._confirm_regular_game(url)
 
 
 def test_confirm_allstar_game_fail():
-    url = ("http://gd2.mlb.com/components/game/mlb/year_2012/ +"
+    url = ("http://gd2.mlb.com/components/game/mlb/year_2012/" +
            "month_07/day_10/gid_2012_07_10_nasmlb_aasmlb_1/")
     assert not pitchfx._confirm_regular_game(url)
 
 
 def test_confirm_springtrain_game_fail():
-    url = ("http://gd2.mlb.com/components/game/mlb/year_2012/ +"
+    url = ("http://gd2.mlb.com/components/game/mlb/year_2012/" +
            "month_03/day_11/gid_2012_03_11_chamlb_colmlb_1/")
     assert not pitchfx._confirm_regular_game(url)
 
