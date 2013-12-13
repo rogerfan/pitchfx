@@ -30,7 +30,8 @@ def dl_pitchfx_data(dates, loc, date_list=False, max_workers=30, timeout=10,
         List of strings formatted as "YYYY-MM-DD".
         If len(dates) == 2 they are used as the endpoints of a range.
         If len(dates) == 1 it is used as the startdate and the enddate is set
-        to the day before the current day. loc : str
+        to the day before the current day.
+    loc : str
         Directory to download data to.
     date_list=False: bool
         If True, treats dates as a list of dates rather than range endpoints.
