@@ -33,15 +33,15 @@ def dl_pitchfx_data(dates, loc, date_list=False, max_workers=30, timeout=10,
         to the day before the current day.
     loc : str
         Directory to download data to.
-    date_list=False: bool
+    date_list: bool [False]
         If True, treats dates as a list of dates rather than range endpoints.
-    max_workers=30: int
+    max_workers: int [30]
         Maximum threads to use when downloading data.
-    timeout=20: float
+    timeout: float [20]
         Timeout in seconds for http requests.
-    sleep=1: float
+    sleep: float [1]
         Time in seconds to sleep between game downloads.
-    retry=False: bool
+    retry: bool [False]
         Retry downloading problem dates until all dates are successfully dled.
 
     '''

@@ -16,6 +16,7 @@ def delete_folder(path):
     if os.path.isdir(path):
         shutil.rmtree(path)
 
+
 # Tests
 class TestGetURL:
     def test_basic(self):
@@ -105,26 +106,34 @@ class TestDLPitchFXData:
 
     @raises(ValueError)
     def test_0dates(self):
-        pitchfx.dl_pitchfx_data((),
+        pitchfx.dl_pitchfx_data(
+            (),
             self.folder, date_list=False,
-            max_workers=50, timeout=10, sleep=1, retry=False)
+            max_workers=50, timeout=10, sleep=1, retry=False
+        )
 
     @raises(ValueError)
     def test_m2dates(self):
-        pitchfx.dl_pitchfx_data(("2012-09-20", "2012-09-20", "2012-09-21"),
+        pitchfx.dl_pitchfx_data(
+            ("2012-09-20", "2012-09-20", "2012-09-21"),
             self.folder, date_list=False,
-            max_workers=50, timeout=10, sleep=1, retry=False)
+            max_workers=50, timeout=10, sleep=1, retry=False
+        )
 
     @raises(ValueError)
     def test_bad_date_format1(self):
-        pitchfx.dl_pitchfx_data(("2012-09-20", "2012-15-20"),
+        pitchfx.dl_pitchfx_data(
+            ("2012-09-20", "2012-15-20"),
             self.folder, date_list=False,
-            max_workers=50, timeout=10, sleep=1, retry=False)
+            max_workers=50, timeout=10, sleep=1, retry=False
+        )
 
     @raises(ValueError)
     def test_bad_date_format2(self):
-        pitchfx.dl_pitchfx_data(("9/20/2012"),
+        pitchfx.dl_pitchfx_data(
+            ("9/20/2012"),
             self.folder, date_list=False,
-            max_workers=50, timeout=10, sleep=1, retry=False)
+            max_workers=50, timeout=10, sleep=1, retry=False
+        )
 
 
