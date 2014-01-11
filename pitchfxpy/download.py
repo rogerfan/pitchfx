@@ -7,8 +7,8 @@ import requests
 from bs4 import BeautifulSoup
 
 
-def download(dates, loc, date_list=False, max_workers=30, timeout=10,
-             sleep=1, retry=False):
+def download_data(dates, loc, date_list=False, max_workers=30, timeout=10,
+                  sleep=1, retry=False):
     '''Download all regular season pitch f/x data for a given date range.
 
     Arguments
@@ -113,7 +113,7 @@ def download(dates, loc, date_list=False, max_workers=30, timeout=10,
 
         if retry:
             print("\nRetrying dates with HTTP timeouts.")
-            download(
+            download_data(
                 problems, loc, date_list=True, max_workers=max_workers,
                 timeout=timeout, sleep=sleep, retry=retry
             )

@@ -3,7 +3,7 @@ import shutil
 
 from nose.tools import raises
 
-import pitchfx
+import pitchfxpy.download as download
 
 
 # Functions to create and delete folders
@@ -29,16 +29,16 @@ class TestGetURL:
             '''gameday_link="2012_03_11_chamlb_colmlb_1"''',
             '''winning_pitcher first_name="Jamie" first="Jamie" id="119469"'''
         ]
-        text = pitchfx._get_url(url)
+        text = download._get_url(url)
 
         for test_text in test_texts:
             assert test_text in text
 
-    @raises(pitchfx.Error404)
+    @raises(download.Error404)
     def test_nonexistent_url(self):
         url = ("http://gd2.mlb.com/components/game/mlb/year_2012/" +
                "month_03/day_11/gid_2012_03_11_chamlb_colmlb_1/linesgfcore.xml")
-        pitchfx._get_url(url)
+        download._get_url(url)
 
 
 class TestConfirmRegularGame:
@@ -47,23 +47,23 @@ class TestConfirmRegularGame:
 
     def test_regular_game(self):
         url = self.urlstub + "/month_06/day_10/gid_2012_06_10_nynmlb_nyamlb_1"
-        assert pitchfx._confirm_regular_game(url)
+        assert download._confirm_regular_game(url)
 
     def test_error_game(self):
         url = self.urlstub + "month_06/day_10/gid_2012_06_10_tbamlb_flomlb_1"
-        assert not pitchfx._confirm_regular_game(url)
+        assert not download._confirm_regular_game(url)
 
     def test_playoff_game(self):
         url = self.urlstub + "month_10/day_06/gid_2012_10_06_oakmlb_detmlb_1/"
-        assert not pitchfx._confirm_regular_game(url)
+        assert not download._confirm_regular_game(url)
 
     def test_allstar_game(self):
         url = self.urlstub + "month_07/day_10/gid_2012_07_10_nasmlb_aasmlb_1/"
-        assert not pitchfx._confirm_regular_game(url)
+        assert not download._confirm_regular_game(url)
 
     def test_springtrain_game(self):
         url = self.urlstub + "month_03/day_11/gid_2012_03_11_chamlb_colmlb_1/"
-        assert not pitchfx._confirm_regular_game(url)
+        assert not download._confirm_regular_game(url)
 
 
 class TestDLGameData:
@@ -80,7 +80,7 @@ class TestDLGameData:
 
     def test_basic(self):
 
-        pitchfx._dl_game_data(self.url_loc, self.folder, self.gamename)
+        download._dl_game_data(self.url_loc, self.folder, self.gamename)
 
         assert os.path.isdir(self.folder + self.gamename + "/batters")
         assert os.path.isfile(self.folder + self.gamename + "/batters/121250.xml")
@@ -96,7 +96,7 @@ class TestDLGameData:
         assert os.path.isfile(self.folder + self.gamename + "/players.xml")
 
 
-class TestDLPitchFXData:
+class TestDownloadData:
     def setup(self):
         self.folder = "test_folder"
         create_folder(self.folder)
@@ -106,7 +106,7 @@ class TestDLPitchFXData:
 
     @raises(ValueError)
     def test_0dates(self):
-        pitchfx.dl_pitchfx_data(
+        download.download_data(
             (),
             self.folder, date_list=False,
             max_workers=50, timeout=10, sleep=1, retry=False
@@ -114,7 +114,7 @@ class TestDLPitchFXData:
 
     @raises(ValueError)
     def test_m2dates(self):
-        pitchfx.dl_pitchfx_data(
+        download.download_data(
             ("2012-09-20", "2012-09-20", "2012-09-21"),
             self.folder, date_list=False,
             max_workers=50, timeout=10, sleep=1, retry=False
@@ -122,7 +122,7 @@ class TestDLPitchFXData:
 
     @raises(ValueError)
     def test_bad_date_format1(self):
-        pitchfx.dl_pitchfx_data(
+        download.download_data(
             ("2012-09-20", "2012-15-20"),
             self.folder, date_list=False,
             max_workers=50, timeout=10, sleep=1, retry=False
@@ -130,10 +130,8 @@ class TestDLPitchFXData:
 
     @raises(ValueError)
     def test_bad_date_format2(self):
-        pitchfx.dl_pitchfx_data(
+        download.download_data(
             ("9/20/2012"),
             self.folder, date_list=False,
             max_workers=50, timeout=10, sleep=1, retry=False
         )
-
-
