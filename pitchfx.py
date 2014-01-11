@@ -7,19 +7,6 @@ import requests
 from bs4 import BeautifulSoup
 
 
-def main():
-    '''Script for testing.'''
-
-    loc = "test"
-
-    _create_folder(loc)
-
-    dl_pitchfx_data(("2012-09-20", "2012-09-20"), loc, date_list=False,
-                    max_workers=50, timeout=10, sleep=1, retry=True)
-
-    print("Done.")
-
-
 def dl_pitchfx_data(dates, loc, date_list=False, max_workers=30, timeout=10,
                     sleep=1, retry=False):
     '''Download all regular season pitch f/x data for a given date range.
@@ -253,7 +240,3 @@ def _create_folder(path):
 
 class Error404(Exception):
     pass
-
-
-if __name__ == "__main__":
-    main()
